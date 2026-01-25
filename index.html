@@ -1,133 +1,134 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Acceso Prosud</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div id="login-screen">
+        <div class="login-card">
+            <h2>🔑 Control de Acceso</h2>
+            <input type="email" id="login-email" placeholder="Correo" autocomplete="off">
+            <input type="password" id="login-password" placeholder="Contraseña" autocomplete="off">
+            <button id="btn-login" class="btn-save">Entrar al Sistema</button>
+        </div>
+    </div>
 
-const firebaseConfig = {
-    apiKey: "AIzaSyBZxSJBPrOkDWRAqPG0tJM4AdwT5kgzjnk",
-    authDomain: "registro-ingreso-5d3a1.firebaseapp.com",
-    projectId: "registro-ingreso-5d3a1",
-    storageBucket: "registro-ingreso-5d3a1.firebasestorage.app",
-    messagingSenderId: "737060993636",
-    appId: "1:737060993636:web:3a1d2783bcbdd534a6bd71"
-};
+    <div id="app-body" style="display:none;">
+        <header>
+            <h1>Control Prosud</h1>
+            <button id="btn-logout" class="logout-link">Cerrar Sesión</button>
+        </header>
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+        <div class="tabs">
+            <button class="tab-btn active" id="btn-tab-transporte">🚍 Transporte</button>
+            <button class="tab-btn" id="btn-tab-visitas">🧍 Visitas</button>
+        </div>
 
-setPersistence(auth, browserLocalPersistence);
+        <main>
+            <div id="admin-panel" style="display:none; margin-bottom:15px; gap:10px; display:flex; flex-direction:column;">
+                <button id="btn-abrir-reportes" class="btn-new">📊 Reportes Excel</button>
+                <button id="btn-gestionar-guardias" class="btn-new" style="display:none;">👥 Gestionar Guardias</button>
+            </div>
 
-// OPTIMIZACIÓN: Cargar guardias en tus selects actuales
-async function cargarGuardias() {
-    const qGuardias = query(collection(db, "lista_guardias"), orderBy("nombre"));
-    const snapGuardias = await getDocs(qGuardias);
-    
-    // Usamos los IDs que encontraste en tu HTML
-    const selectT = document.getElementById('t-guardia-id'); // Select de Transporte
-    const selectV = document.getElementById('v-guardia-id'); // Select de Visitas
-    
-    const optionsHtml = snapGuardias.docs.map(doc => {
-        const g = doc.data();
-        return `<option value="${g.nombre}">${g.nombre}</option>`;
-    }).join('');
+            <section id="sec-transporte" class="tab-content active">
+                <form id="form-transporte" autocomplete="off">
+                    <h2>Ingreso Transporte</h2>
+                    <select id="t-guardia-id" required class="select-guardia"><option value="">Cargando...</option></select>
+                    
+                    <div class="autocomplete-container">
+                        <input type="text" id="t-rut" placeholder="RUT Conductor" required>
+                        <div id="t-sugerencias" class="sugerencias-box"></div>
+                    </div>
 
-    const placeholder = '<option value="">-- Seleccione Guardia --</option>';
-    if(selectT) selectT.innerHTML = placeholder + optionsHtml;
-    if(selectV) selectV.innerHTML = placeholder + optionsHtml;
-}
+                    <input type="text" id="t-nombre" placeholder="Nombre" readonly class="readonly">
+                    <input type="text" id="t-empresa" placeholder="Empresa" readonly class="readonly">
+                    
+                    <div class="autocomplete-container">
+                        <input type="text" id="t-patente" placeholder="Patente (ej: ABCD-12)" required>
+                        <div id="p-sugerencias" class="sugerencias-box"></div>
+                    </div>
 
-// Lógica de Login (Simplificada)
-document.getElementById('btn-login').onclick = async () => {
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-password').value;
-    try {
-        await signInWithEmailAndPassword(auth, email, pass);
-    } catch (e) { alert("Error: Credenciales incorrectas"); }
-};
+                    <div class="button-group">
+                        <button type="submit" class="btn-save">Guardar</button>
+                        <button type="button" id="btn-abrir-modal" class="btn-new">+ Maestro</button>
+                    </div>
+                </form>
+            </section>
 
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('app-body').style.display = 'block';
-        cargarGuardias(); // Carga la lista de nombres apenas entras
-    } else {
-        document.getElementById('login-screen').style.display = 'flex';
-        document.getElementById('app-body').style.display = 'none';
-    }
-});
+            <section id="sec-visitas" class="tab-content" style="display:none;">
+                <form id="form-visitas" autocomplete="off">
+                    <h2>Registro Visita</h2>
+                    <select id="v-guardia-id" required class="select-guardia"><option value="">Cargando...</option></select>
+                    
+                    <div class="autocomplete-container">
+                        <input type="text" id="v-rut" placeholder="RUT Visita" required>
+                        <div id="v-sugerencias-rut" class="sugerencias-box"></div>
+                    </div>
 
-document.getElementById('btn-logout').onclick = () => signOut(auth);
+                    <input type="text" id="v-nombre" placeholder="Nombre Completo" required>
+                    <input type="text" id="v-representa" placeholder="Empresa a la que representa" required>
+                    <input type="text" id="v-motivo" placeholder="Motivo de la visita" required>
+                    
+                    <div class="toggle-container">
+                        <span>¿Viene en vehículo?</span>
+                        <input type="checkbox" id="v-check-vehiculo">
+                    </div>
 
-// GUARDAR REGISTRO CON TRAZABILIDAD
-async function guardarRegistro(tipo) {
-    const data = {
-        fecha: new Date().toLocaleDateString(),
-        hora: new Date().toLocaleTimeString(),
-        tipo: tipo
-    };
+                    <div class="autocomplete-container">
+                        <input type="text" id="v-patente" placeholder="Patente" style="display:none;">
+                        <div id="v-sugerencias-patente" class="sugerencias-box"></div>
+                    </div>
 
-    if (tipo === 'TRANSPORTE') {
-        data.rut = document.getElementById('t-rut').value;
-        data.nombre = document.getElementById('t-nombre').value;
-        data.empresa = document.getElementById('t-empresa').value;
-        data.patente = document.getElementById('t-patente').value;
-        data.guardia = document.getElementById('t-guardia-id').value; // Captura del select de transporte
-    } else {
-        data.rut = document.getElementById('v-rut').value;
-        data.nombre = document.getElementById('v-nombre').value;
-        data.empresa = document.getElementById('v-empresa').value;
-        data.patente = document.getElementById('v-patente').value || "N/A";
-        data.guardia = document.getElementById('v-guardia-id').value; // Captura del select de visitas
-    }
+                    <button type="submit" class="btn-save">Guardar Visita</button>
+                </form>
+            </section>
+        </main>
+    </div>
 
-    if (!data.guardia) return alert("⚠️ Debe seleccionar su nombre de la lista de Guardias");
-    if (!data.rut || !data.nombre) return alert("❌ Complete los campos obligatorios");
+    <div id="modal-gestion-guardias" class="modal">
+        <div class="modal-content">
+            <h3>👥 Lista de Guardias</h3>
+            <div id="lista-guardias-admin" style="max-height: 180px; overflow-y: auto; border: 1px solid #ddd; margin-bottom: 10px;"></div>
+            <input type="text" id="nuevo-guardia-nombre" placeholder="Nombre guardia">
+            <button id="btn-add-guardia" class="btn-save">Agregar</button>
+            <button type="button" id="btn-cerrar-gestion" class="btn-close-text">Cerrar</button>
+        </div>
+    </div>
 
-    try {
-        await addDoc(collection(db, "registros"), data);
-        alert("✅ Registro Guardado con éxito");
-        location.reload(); 
-    } catch (e) { alert("Error al guardar en base de datos"); }
-}
+    <div id="modal-conductor" class="modal">
+        <div class="modal-content">
+            <h3>Registrar en Maestro</h3>
+            <form id="form-maestro">
+                <input type="text" id="m-rut" placeholder="RUT" required>
+                <input type="text" id="m-nombre" placeholder="Nombre" required>
+                <input type="text" id="m-empresa" placeholder="Empresa" required>
+                <button type="submit" class="btn-save">Guardar</button>
+                <button type="button" id="btn-cerrar-modal" class="btn-close-text">Cancelar</button>
+            </form>
+        </div>
+    </div>
 
-// Vinculación con los botones de tu HTML
-document.getElementById('btn-save-t').onclick = () => guardarRegistro('TRANSPORTE');
-document.getElementById('btn-save-v').onclick = () => guardarRegistro('VISITA');
+    <div id="modal-reportes" class="modal">
+        <div class="modal-content">
+            <h3>Reportes Excel</h3>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <select id="filtro-tipo">
+                    <option value="TODOS">Todos</option>
+                    <option value="TRANSPORTE">Transporte</option>
+                    <option value="VISITA">Visitas</option>
+                </select>
+                <input type="date" id="fecha-inicio">
+                <input type="date" id="fecha-fin">
+                <button id="btn-exportar" class="btn-excel">Generar Excel</button>
+                <button type="button" id="btn-cerrar-reportes" class="btn-close-text">Cerrar</button>
+            </div>
+        </div>
+    </div>
 
-// EXPORTAR EXCEL (Ya incluye la columna Guardia)
-document.getElementById('btn-exportar').onclick = async () => {
-    const q = query(collection(db, "registros"), orderBy("fecha", "desc"));
-    const snap = await getDocs(q);
-    const excelData = snap.docs.map(doc => {
-        const r = doc.data();
-        return {
-            Fecha: r.fecha,
-            Hora: r.hora,
-            Tipo: r.tipo,
-            RUT: r.rut,
-            Nombre: r.nombre,
-            Empresa: r.empresa,
-            Patente: r.patente,
-            Guardia_Responsable: r.guardia // Esto aparecerá en el Excel
-        };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(excelData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Registros Prosud");
-    XLSX.writeFile(wb, `Reporte_Control_${new Date().toLocaleDateString()}.xlsx`);
-};
-
-// Mantener funciones de navegación de pestañas (Tabs)
-document.getElementById('btn-tab-transporte').onclick = () => {
-    document.getElementById('sec-transporte').style.display='block';
-    document.getElementById('sec-visitas').style.display='none';
-    document.getElementById('btn-tab-transporte').classList.add('active');
-    document.getElementById('btn-tab-visitas').classList.remove('active');
-};
-document.getElementById('btn-tab-visitas').onclick = () => {
-    document.getElementById('sec-visitas').style.display='block';
-    document.getElementById('sec-transporte').style.display='none';
-    document.getElementById('btn-tab-visitas').classList.add('active');
-    document.getElementById('btn-tab-transporte').classList.remove('active');
-};
+    <script type="module" src="script.js"></script>
+</body>
+</html>
