@@ -19,41 +19,49 @@ setPersistence(auth, browserLocalPersistence);
 
 let maestros = [];
 
-// 1. CARGA INICIAL DE DATOS (Guardias y Maestro para autocompletado)
+// --- FUNCIONES DE SOPORTE (Restauradas para que nada se bloquee) ---
+const formatearRUT = (rut) => {
+    let valor = rut.replace(/\./g, '').replace(/-/g, '').toUpperCase();
+    if (valor.length < 2) return valor;
+    let cuerpo = valor.slice(0, -1);
+    let dv = valor.slice(-1);
+    return cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + "-" + dv;
+};
+
+const formatearPatente = (p) => p.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 6);
+
+// --- CARGA DE DATOS ---
 async function cargarDatosIniciales() {
-    // Cargar Guardias
-    const qG = query(collection(db, "lista_guardias"), orderBy("nombre"));
-    const snapG = await getDocs(qG);
-    const selectT = document.getElementById('t-guardia-id');
-    const selectV = document.getElementById('v-guardia-id');
-    const listaG = document.getElementById('lista-guardias-ul'); // Para el panel de gestión
-    
-    let options = '<option value="">-- Seleccione Guardia --</option>';
-    let itemsLi = '';
+    try {
+        // Cargar Guardias
+        const snapG = await getDocs(query(collection(db, "lista_guardias"), orderBy("nombre")));
+        const selectT = document.getElementById('t-guardia-id');
+        const selectV = document.getElementById('v-guardia-id');
+        const listaG = document.getElementById('lista-guardias-ul');
+        
+        let options = '<option value="">-- Seleccione Guardia --</option>';
+        let itemsLi = '';
+        snapG.forEach(d => {
+            const g = d.data();
+            options += `<option value="${g.nombre}">${g.nombre}</option>`;
+            itemsLi += `<li>${g.nombre} <button onclick="eliminarGuardia('${d.id}')" style="margin-left:10px; background:none; border:none; cursor:pointer;">❌</button></li>`;
+        });
+        if(selectT) selectT.innerHTML = options;
+        if(selectV) selectV.innerHTML = options;
+        if(listaG) listaG.innerHTML = itemsLi;
 
-    snapG.forEach(docSnap => {
-        const g = docSnap.data();
-        options += `<option value="${g.nombre}">${g.nombre}</option>`;
-        itemsLi += `<li>${g.nombre} <button onclick="eliminarGuardia('${docSnap.id}')">❌</button></li>`;
-    });
-
-    if(selectT) selectT.innerHTML = options;
-    if(selectV) selectV.innerHTML = options;
-    if(listaG) listaG.innerHTML = itemsLi;
-
-    // Cargar Maestro para autocompletado de RUT
-    const qM = collection(db, "conductores");
-    const snapM = await getDocs(qM);
-    maestros = snapM.docs.map(d => d.data());
+        // Cargar Maestro
+        const snapM = await getDocs(collection(db, "conductores"));
+        maestros = snapM.docs.map(d => d.data());
+    } catch (e) { console.error("Error cargando datos:", e); }
 }
 
-// 2. LÓGICA DE LOGIN Y ROLES (Tu correo es Admin)
+// --- LÓGICA DE SESIÓN ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-body').style.display = 'block';
         cargarDatosIniciales();
-        // Solo tú ves el botón de gestión de guardias
         if (user.email === 'bfernandez@prosud.cl') {
             document.getElementById('btn-gestionar-guardias').style.display = 'block';
         }
@@ -63,17 +71,41 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// 3. AUTOCOMPLETADO DE RUT (Reparado)
+document.getElementById('btn-login').onclick = async () => {
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-password').value;
+    try { await signInWithEmailAndPassword(auth, email, pass); } 
+    catch (e) { alert("Error en login"); }
+};
+
+document.getElementById('btn-logout').onclick = () => signOut(auth);
+
+// --- NAVEGACIÓN (Restaurada) ---
+document.getElementById('btn-tab-transporte').onclick = () => {
+    document.getElementById('sec-transporte').style.display='block';
+    document.getElementById('sec-visitas').style.display='none';
+    document.getElementById('btn-tab-transporte').classList.add('active');
+    document.getElementById('btn-tab-visitas').classList.remove('active');
+};
+document.getElementById('btn-tab-visitas').onclick = () => {
+    document.getElementById('sec-visitas').style.display='block';
+    document.getElementById('sec-transporte').style.display='none';
+    document.getElementById('btn-tab-visitas').classList.add('active');
+    document.getElementById('btn-tab-transporte').classList.remove('active');
+};
+
+// --- AUTOCOMPLETADO Y FORMATEO ---
 document.getElementById('t-rut').oninput = (e) => {
+    e.target.value = formatearRUT(e.target.value);
     const val = e.target.value;
-    const sugerencias = maestros.filter(m => m.rut.includes(val));
     const box = document.getElementById('t-sugerencias');
     box.innerHTML = '';
-    if (val.length > 2) {
-        sugerencias.forEach(s => {
+    if (val.length > 3) {
+        const sug = maestros.filter(m => m.rut.includes(val));
+        sug.forEach(s => {
             const div = document.createElement('div');
             div.className = 'sugerencia-item';
-            div.innerText = `${s.rut} - ${s.nombre}`;
+            div.innerText = `${s.rut} | ${s.nombre}`;
             div.onclick = () => {
                 document.getElementById('t-rut').value = s.rut;
                 document.getElementById('t-nombre').value = s.nombre;
@@ -85,40 +117,11 @@ document.getElementById('t-rut').oninput = (e) => {
     }
 };
 
-// 4. REPORTES EXCEL (Reparado)
-document.getElementById('btn-exportar').onclick = async () => {
-    const q = query(collection(db, "registros"), orderBy("fecha", "desc"));
-    const snap = await getDocs(q);
-    const data = snap.docs.map(d => {
-        const r = d.data();
-        return {
-            Fecha: r.fecha, Hora: r.hora, Tipo: r.tipo, RUT: r.rut, 
-            Nombre: r.nombre, Empresa: r.empresa, Patente: r.patente, 
-            Guardia: r.guardia || "No registrado"
-        };
-    });
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Registros");
-    XLSX.writeFile(wb, "Reporte_Prosud.xlsx");
-};
+document.getElementById('v-rut').oninput = (e) => e.target.value = formatearRUT(e.target.value);
+document.getElementById('t-patente').oninput = (e) => e.target.value = formatearPatente(e.target.value);
+document.getElementById('v-patente').oninput = (e) => e.target.value = formatearPatente(e.target.value);
 
-// 5. FUNCIONES DE INTERFAZ (Modales y Tabs)
-document.getElementById('btn-tab-transporte').onclick = () => {
-    document.getElementById('sec-transporte').style.display='block';
-    document.getElementById('sec-visitas').style.display='none';
-};
-document.getElementById('btn-tab-visitas').onclick = () => {
-    document.getElementById('sec-visitas').style.display='block';
-    document.getElementById('sec-transporte').style.display='none';
-};
-document.getElementById('btn-gestionar-guardias').onclick = () => document.getElementById('modal-gestion-guardias').style.display='flex';
-document.getElementById('btn-cerrar-gestion').onclick = () => document.getElementById('modal-gestion-guardias').style.display='none';
-document.getElementById('btn-abrir-reportes').onclick = () => document.getElementById('modal-reportes').style.display='flex';
-document.getElementById('btn-cerrar-reportes').onclick = () => document.getElementById('modal-reportes').style.display='none';
-document.getElementById('btn-logout').onclick = () => signOut(auth);
-
-// 6. GUARDAR REGISTROS
+// --- GUARDAR REGISTROS ---
 async function guardar(tipo) {
     const data = {
         fecha: new Date().toLocaleDateString(),
@@ -131,27 +134,70 @@ async function guardar(tipo) {
         guardia: document.getElementById(tipo === 'TRANSPORTE' ? 't-guardia-id' : 'v-guardia-id').value
     };
 
-    if(!data.guardia) return alert("Seleccione Guardia");
-    await addDoc(collection(db, "registros"), data);
-    alert("Guardado");
-    location.reload();
+    if(!data.guardia || !data.rut || !data.nombre) return alert("Complete todos los campos y seleccione Guardia");
+
+    try {
+        await addDoc(collection(db, "registros"), data);
+        alert("✅ Guardado con éxito");
+        location.reload();
+    } catch (e) { alert("Error al guardar"); }
 }
 
 document.getElementById('btn-save-t').onclick = () => guardar('TRANSPORTE');
 document.getElementById('btn-save-v').onclick = () => guardar('VISITA');
 
-// 7. GESTIÓN DE GUARDIAS (Añadir/Eliminar)
+// --- MODALES ---
+document.getElementById('btn-gestionar-guardias').onclick = () => document.getElementById('modal-gestion-guardias').style.display='flex';
+document.getElementById('btn-cerrar-gestion').onclick = () => document.getElementById('modal-gestion-guardias').style.display='none';
+document.getElementById('btn-abrir-reportes').onclick = () => document.getElementById('modal-reportes').style.display='flex';
+document.getElementById('btn-cerrar-reportes').onclick = () => document.getElementById('modal-reportes').style.display='none';
+document.getElementById('btn-abrir-modal').onclick = () => document.getElementById('modal-conductor').style.display='flex';
+document.getElementById('btn-cerrar-modal').onclick = () => document.getElementById('modal-conductor').style.display='none';
+
+// --- GESTIÓN DE GUARDIAS ---
 document.getElementById('form-add-guardia').onsubmit = async (e) => {
     e.preventDefault();
-    const nombre = document.getElementById('nuevo-guardia-nombre').value;
-    await addDoc(collection(db, "lista_guardias"), { nombre });
-    alert("Guardia añadido");
+    const n = document.getElementById('nuevo-guardia-nombre').value;
+    await addDoc(collection(db, "lista_guardias"), { nombre: n });
+    e.target.reset();
     cargarDatosIniciales();
 };
 
 window.eliminarGuardia = async (id) => {
-    if(confirm("¿Eliminar guardia?")) {
+    if(confirm("¿Eliminar?")) {
         await deleteDoc(doc(db, "lista_guardias", id));
         cargarDatosIniciales();
     }
+};
+
+// --- EXPORTAR EXCEL ---
+document.getElementById('btn-exportar').onclick = async () => {
+    const snap = await getDocs(query(collection(db, "registros"), orderBy("fecha", "desc")));
+    const data = snap.docs.map(d => {
+        const r = d.data();
+        return {
+            Fecha: r.fecha, Hora: r.hora, Tipo: r.tipo, RUT: r.rut, 
+            Nombre: r.nombre, Empresa: r.empresa, Patente: r.patente, 
+            Guardia: r.guardia
+        };
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Registros");
+    XLSX.writeFile(wb, "Reporte_Prosud.xlsx");
+};
+
+// MAESTRO CONDUCTORES
+document.getElementById('m-rut').oninput = (e) => e.target.value = formatearRUT(e.target.value);
+document.getElementById('form-maestro').onsubmit = async (e) => {
+    e.preventDefault();
+    await addDoc(collection(db, "conductores"), {
+        rut: document.getElementById('m-rut').value,
+        nombre: document.getElementById('m-nombre').value,
+        empresa: document.getElementById('m-empresa').value
+    });
+    alert("Maestro Actualizado");
+    e.target.reset();
+    document.getElementById('modal-conductor').style.display='none';
+    cargarDatosIniciales();
 };
