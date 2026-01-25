@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -17,117 +17,141 @@ const auth = getAuth(app);
 
 setPersistence(auth, browserLocalPersistence);
 
-// OPTIMIZACIÓN: Cargar guardias en tus selects actuales
-async function cargarGuardias() {
-    const qGuardias = query(collection(db, "lista_guardias"), orderBy("nombre"));
-    const snapGuardias = await getDocs(qGuardias);
-    
-    // Usamos los IDs que encontraste en tu HTML
-    const selectT = document.getElementById('t-guardia-id'); // Select de Transporte
-    const selectV = document.getElementById('v-guardia-id'); // Select de Visitas
-    
-    const optionsHtml = snapGuardias.docs.map(doc => {
-        const g = doc.data();
-        return `<option value="${g.nombre}">${g.nombre}</option>`;
-    }).join('');
+let maestros = [];
 
-    const placeholder = '<option value="">-- Seleccione Guardia --</option>';
-    if(selectT) selectT.innerHTML = placeholder + optionsHtml;
-    if(selectV) selectV.innerHTML = placeholder + optionsHtml;
+// 1. CARGA INICIAL DE DATOS (Guardias y Maestro para autocompletado)
+async function cargarDatosIniciales() {
+    // Cargar Guardias
+    const qG = query(collection(db, "lista_guardias"), orderBy("nombre"));
+    const snapG = await getDocs(qG);
+    const selectT = document.getElementById('t-guardia-id');
+    const selectV = document.getElementById('v-guardia-id');
+    const listaG = document.getElementById('lista-guardias-ul'); // Para el panel de gestión
+    
+    let options = '<option value="">-- Seleccione Guardia --</option>';
+    let itemsLi = '';
+
+    snapG.forEach(docSnap => {
+        const g = docSnap.data();
+        options += `<option value="${g.nombre}">${g.nombre}</option>`;
+        itemsLi += `<li>${g.nombre} <button onclick="eliminarGuardia('${docSnap.id}')">❌</button></li>`;
+    });
+
+    if(selectT) selectT.innerHTML = options;
+    if(selectV) selectV.innerHTML = options;
+    if(listaG) listaG.innerHTML = itemsLi;
+
+    // Cargar Maestro para autocompletado de RUT
+    const qM = collection(db, "conductores");
+    const snapM = await getDocs(qM);
+    maestros = snapM.docs.map(d => d.data());
 }
 
-// Lógica de Login (Simplificada)
-document.getElementById('btn-login').onclick = async () => {
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-password').value;
-    try {
-        await signInWithEmailAndPassword(auth, email, pass);
-    } catch (e) { alert("Error: Credenciales incorrectas"); }
-};
-
+// 2. LÓGICA DE LOGIN Y ROLES (Tu correo es Admin)
 onAuthStateChanged(auth, (user) => {
     if (user) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-body').style.display = 'block';
-        cargarGuardias(); // Carga la lista de nombres apenas entras
+        cargarDatosIniciales();
+        // Solo tú ves el botón de gestión de guardias
+        if (user.email === 'bfernandez@prosud.cl') {
+            document.getElementById('btn-gestionar-guardias').style.display = 'block';
+        }
     } else {
         document.getElementById('login-screen').style.display = 'flex';
         document.getElementById('app-body').style.display = 'none';
     }
 });
 
-document.getElementById('btn-logout').onclick = () => signOut(auth);
-
-// GUARDAR REGISTRO CON TRAZABILIDAD
-async function guardarRegistro(tipo) {
-    const data = {
-        fecha: new Date().toLocaleDateString(),
-        hora: new Date().toLocaleTimeString(),
-        tipo: tipo
-    };
-
-    if (tipo === 'TRANSPORTE') {
-        data.rut = document.getElementById('t-rut').value;
-        data.nombre = document.getElementById('t-nombre').value;
-        data.empresa = document.getElementById('t-empresa').value;
-        data.patente = document.getElementById('t-patente').value;
-        data.guardia = document.getElementById('t-guardia-id').value; // Captura del select de transporte
-    } else {
-        data.rut = document.getElementById('v-rut').value;
-        data.nombre = document.getElementById('v-nombre').value;
-        data.empresa = document.getElementById('v-empresa').value;
-        data.patente = document.getElementById('v-patente').value || "N/A";
-        data.guardia = document.getElementById('v-guardia-id').value; // Captura del select de visitas
+// 3. AUTOCOMPLETADO DE RUT (Reparado)
+document.getElementById('t-rut').oninput = (e) => {
+    const val = e.target.value;
+    const sugerencias = maestros.filter(m => m.rut.includes(val));
+    const box = document.getElementById('t-sugerencias');
+    box.innerHTML = '';
+    if (val.length > 2) {
+        sugerencias.forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'sugerencia-item';
+            div.innerText = `${s.rut} - ${s.nombre}`;
+            div.onclick = () => {
+                document.getElementById('t-rut').value = s.rut;
+                document.getElementById('t-nombre').value = s.nombre;
+                document.getElementById('t-empresa').value = s.empresa;
+                box.innerHTML = '';
+            };
+            box.appendChild(div);
+        });
     }
+};
 
-    if (!data.guardia) return alert("⚠️ Debe seleccionar su nombre de la lista de Guardias");
-    if (!data.rut || !data.nombre) return alert("❌ Complete los campos obligatorios");
-
-    try {
-        await addDoc(collection(db, "registros"), data);
-        alert("✅ Registro Guardado con éxito");
-        location.reload(); 
-    } catch (e) { alert("Error al guardar en base de datos"); }
-}
-
-// Vinculación con los botones de tu HTML
-document.getElementById('btn-save-t').onclick = () => guardarRegistro('TRANSPORTE');
-document.getElementById('btn-save-v').onclick = () => guardarRegistro('VISITA');
-
-// EXPORTAR EXCEL (Ya incluye la columna Guardia)
+// 4. REPORTES EXCEL (Reparado)
 document.getElementById('btn-exportar').onclick = async () => {
     const q = query(collection(db, "registros"), orderBy("fecha", "desc"));
     const snap = await getDocs(q);
-    const excelData = snap.docs.map(doc => {
-        const r = doc.data();
+    const data = snap.docs.map(d => {
+        const r = d.data();
         return {
-            Fecha: r.fecha,
-            Hora: r.hora,
-            Tipo: r.tipo,
-            RUT: r.rut,
-            Nombre: r.nombre,
-            Empresa: r.empresa,
-            Patente: r.patente,
-            Guardia_Responsable: r.guardia // Esto aparecerá en el Excel
+            Fecha: r.fecha, Hora: r.hora, Tipo: r.tipo, RUT: r.rut, 
+            Nombre: r.nombre, Empresa: r.empresa, Patente: r.patente, 
+            Guardia: r.guardia || "No registrado"
         };
     });
-
-    const ws = XLSX.utils.json_to_sheet(excelData);
+    const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Registros Prosud");
-    XLSX.writeFile(wb, `Reporte_Control_${new Date().toLocaleDateString()}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Registros");
+    XLSX.writeFile(wb, "Reporte_Prosud.xlsx");
 };
 
-// Mantener funciones de navegación de pestañas (Tabs)
+// 5. FUNCIONES DE INTERFAZ (Modales y Tabs)
 document.getElementById('btn-tab-transporte').onclick = () => {
     document.getElementById('sec-transporte').style.display='block';
     document.getElementById('sec-visitas').style.display='none';
-    document.getElementById('btn-tab-transporte').classList.add('active');
-    document.getElementById('btn-tab-visitas').classList.remove('active');
 };
 document.getElementById('btn-tab-visitas').onclick = () => {
     document.getElementById('sec-visitas').style.display='block';
     document.getElementById('sec-transporte').style.display='none';
-    document.getElementById('btn-tab-visitas').classList.add('active');
-    document.getElementById('btn-tab-transporte').classList.remove('active');
+};
+document.getElementById('btn-gestionar-guardias').onclick = () => document.getElementById('modal-gestion-guardias').style.display='flex';
+document.getElementById('btn-cerrar-gestion').onclick = () => document.getElementById('modal-gestion-guardias').style.display='none';
+document.getElementById('btn-abrir-reportes').onclick = () => document.getElementById('modal-reportes').style.display='flex';
+document.getElementById('btn-cerrar-reportes').onclick = () => document.getElementById('modal-reportes').style.display='none';
+document.getElementById('btn-logout').onclick = () => signOut(auth);
+
+// 6. GUARDAR REGISTROS
+async function guardar(tipo) {
+    const data = {
+        fecha: new Date().toLocaleDateString(),
+        hora: new Date().toLocaleTimeString(),
+        tipo: tipo,
+        rut: document.getElementById(tipo === 'TRANSPORTE' ? 't-rut' : 'v-rut').value,
+        nombre: document.getElementById(tipo === 'TRANSPORTE' ? 't-nombre' : 'v-nombre').value,
+        empresa: document.getElementById(tipo === 'TRANSPORTE' ? 't-empresa' : 'v-empresa').value,
+        patente: document.getElementById(tipo === 'TRANSPORTE' ? 't-patente' : 'v-patente').value || "N/A",
+        guardia: document.getElementById(tipo === 'TRANSPORTE' ? 't-guardia-id' : 'v-guardia-id').value
+    };
+
+    if(!data.guardia) return alert("Seleccione Guardia");
+    await addDoc(collection(db, "registros"), data);
+    alert("Guardado");
+    location.reload();
+}
+
+document.getElementById('btn-save-t').onclick = () => guardar('TRANSPORTE');
+document.getElementById('btn-save-v').onclick = () => guardar('VISITA');
+
+// 7. GESTIÓN DE GUARDIAS (Añadir/Eliminar)
+document.getElementById('form-add-guardia').onsubmit = async (e) => {
+    e.preventDefault();
+    const nombre = document.getElementById('nuevo-guardia-nombre').value;
+    await addDoc(collection(db, "lista_guardias"), { nombre });
+    alert("Guardia añadido");
+    cargarDatosIniciales();
+};
+
+window.eliminarGuardia = async (id) => {
+    if(confirm("¿Eliminar guardia?")) {
+        await deleteDoc(doc(db, "lista_guardias", id));
+        cargarDatosIniciales();
+    }
 };
