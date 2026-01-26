@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, getDocs, deleteDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -15,24 +15,57 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Persistencia local: Mantiene la sesión al refrescar (F5)
 setPersistence(auth, browserLocalPersistence);
 
 let maestros = [];
 let listaGuardias = [];
 let maestroPatentes = [];
 
-// --- SESIÓN Y ROLES ---
-onAuthStateChanged(auth, (user) => {
+// --- SESIÓN Y ROLES (MEJORADO: SEGURIDAD PARTE 2) ---
+onAuthStateChanged(auth, async (user) => {
     if (user) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-body').style.display = 'block';
-        configurarPermisos(user.email);
+        
+        // Verificamos si es admin consultando la colección secreta en Firebase
+        await configurarPermisosSeguros(user.email);
     } else {
         document.getElementById('login-screen').style.display = 'flex';
         document.getElementById('app-body').style.display = 'none';
     }
 });
+
+async function configurarPermisosSeguros(email) {
+    const adminPanel = document.getElementById('admin-panel');
+    const btnGestionar = document.getElementById('btn-gestionar-guardias');
+    const btnMaestro = document.getElementById('btn-abrir-modal');
+    
+    try {
+        const adminRef = doc(db, "admins", email);
+        const adminSnap = await getDoc(adminRef);
+
+        if (adminSnap.exists()) {
+            const datosAdmin = adminSnap.data(); // Leemos los datos del documento (rol, etc)
+            
+            // SI ES CUALQUIER JEFE (está en la colección)
+            adminPanel.style.display = 'flex';
+            
+            // Solo quien tenga el valor "administrador" en el campo 'rol' puede gestionar guardias
+            // (Asegúrate que en Firebase, tu documento bfernandez@prosud.cl diga: rol: "administrador")
+            btnGestionar.style.display = (datosAdmin.rol === "administrador") ? 'block' : 'none';
+            
+            btnMaestro.style.display = 'block'; 
+            console.log("Acceso Jefatura detectado. Rol:", datosAdmin.rol);
+        } else {
+            // ES GUARDIA
+            adminPanel.style.display = 'none';
+            btnMaestro.style.display = 'block';
+            console.log("Acceso Guardia detectado");
+        }
+    } catch (error) {
+        console.error("Error verificando permisos:", error);
+    }
+}
 
 document.getElementById('btn-login').onclick = () => {
     const email = document.getElementById('login-email').value;
@@ -41,15 +74,6 @@ document.getElementById('btn-login').onclick = () => {
 };
 
 document.getElementById('btn-logout').onclick = () => { signOut(auth); };
-
-function configurarPermisos(email) {
-    const isAdmin = (email === "bfernandez@prosud.cl");
-    const listaJefes = ["eortiz@prosud.cl", "rrojasa@prosud.cl"];
-    const isJefe = listaJefes.includes(email);
-    document.getElementById('admin-panel').style.display = (isAdmin || isJefe) ? 'flex' : 'none';
-    document.getElementById('btn-gestionar-guardias').style.display = isAdmin ? 'block' : 'none';
-    document.getElementById('btn-abrir-modal').style.display = isJefe ? 'none' : 'block';
-}
 
 // --- FUNCIONES DE FORMATEO ---
 function formatearRUT(rut) {
@@ -164,7 +188,7 @@ document.getElementById('form-visitas').onsubmit = async (e) => {
     document.getElementById('v-patente').style.display = 'none';
 };
 
-// --- EXPORTAR EXCEL (ORDENADO CRONOLÓGICAMENTE) ---
+// --- EXPORTAR EXCEL ---
 document.getElementById('btn-exportar').onclick = async () => {
     const inicio = document.getElementById('fecha-inicio').value;
     const fin = document.getElementById('fecha-fin').value;
@@ -181,14 +205,12 @@ document.getElementById('btn-exportar').onclick = async () => {
 
     if(filtrados.length === 0) return alert("Sin datos para este rango.");
 
-    // Orden Cronológico: De más antiguo a más reciente
     filtrados.sort((a, b) => {
         const fechaA = a.fechaFiltro + a.hora;
         const fechaB = b.fechaFiltro + b.hora;
         return fechaA.localeCompare(fechaB);
     });
 
-    // Mapeado de Columnas (Orden solicitado)
     const datosOrdenados = filtrados.map(r => {
         const fila = {
             "Rut": r.rut,
