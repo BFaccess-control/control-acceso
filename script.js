@@ -187,7 +187,7 @@ document.getElementById('form-visitas').onsubmit = async (e) => {
     document.getElementById('v-patente').style.display = 'none';
 };
 
-// --- EXPORTAR EXCEL ---
+// --- EXPORTAR EXCEL (CON COLUMNA GUARDIA) ---
 document.getElementById('btn-exportar').onclick = async () => {
     const inicio = document.getElementById('fecha-inicio').value;
     const fin = document.getElementById('fecha-fin').value;
@@ -204,20 +204,24 @@ document.getElementById('btn-exportar').onclick = async () => {
 
     if(filtrados.length === 0) return alert("Sin datos para este rango.");
 
+    // Orden Cronológico
     filtrados.sort((a, b) => {
         const fechaA = a.fechaFiltro + a.hora;
         const fechaB = b.fechaFiltro + b.hora;
         return fechaA.localeCompare(fechaB);
     });
 
+    // Mapeado de Columnas (Ahora incluye "Guardia")
     const datosOrdenados = filtrados.map(r => {
         const fila = {
+            "Fecha": r.fecha,
+            "Hora": r.hora,
+            "Tipo": r.tipo,
+            "Guardia": r.guardia || "No especificado", // <-- Nueva columna agregada
             "Rut": r.rut,
             "Nombre": r.nombre,
             "Empresa": r.empresa,
-            "Patente": r.patente,
-            "Fecha": r.fecha,
-            "Hora": r.hora
+            "Patente": r.patente
         };
         if (r.motivo) fila["Motivo"] = r.motivo;
         return fila;
@@ -264,4 +268,5 @@ document.getElementById('form-maestro').onsubmit = async (e) => {
     await addDoc(collection(db, "conductores"), { rut: document.getElementById('m-rut').value, nombre: document.getElementById('m-nombre').value, empresa: document.getElementById('m-empresa').value });
     alert("Maestro Actualizado"); e.target.reset(); document.getElementById('modal-conductor').style.display = 'none';
 };
+
 
