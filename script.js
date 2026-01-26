@@ -51,7 +51,6 @@ async function configurarPermisosSeguros(email) {
             adminPanel.style.display = 'flex';
             
             // Solo quien tenga el valor "administrador" en el campo 'rol' puede gestionar guardias
-            // (Asegúrate que en Firebase, tu documento bfernandez@prosud.cl diga: rol: "administrador")
             btnGestionar.style.display = (datosAdmin.rol === "administrador") ? 'block' : 'none';
             
             btnMaestro.style.display = 'block'; 
@@ -265,3 +264,4 @@ document.getElementById('form-maestro').onsubmit = async (e) => {
     await addDoc(collection(db, "conductores"), { rut: document.getElementById('m-rut').value, nombre: document.getElementById('m-nombre').value, empresa: document.getElementById('m-empresa').value });
     alert("Maestro Actualizado"); e.target.reset(); document.getElementById('modal-conductor').style.display = 'none';
 };
+
