@@ -29,16 +29,21 @@
         </div>
 
         <main>
-            <section id="sec-transporte" class="tab-content">
-                <form id="form-transporte">
+            <div id="admin-panel" style="display:none; margin: 15px 0; gap:10px; justify-content: center;">
+                <button id="btn-abrir-reportes" class="btn-new">📊 Reportes Excel</button>
+                <button id="btn-gestionar-guardias" class="btn-new">👥 Gestionar Guardias</button>
+            </div>
+
+            <section id="sec-transporte" class="tab-content active">
+                <form id="form-transporte" autocomplete="off">
                     <h2>Ingreso Transporte</h2>
-                    <select id="t-guardia-id" required></select>
+                    <select id="t-guardia-id" required class="select-guardia"><option value="">Cargando...</option></select>
                     
                     <div class="autocomplete-container">
                         <input type="text" id="t-rut" placeholder="RUT Conductor" required>
                         <div id="t-sugerencias" class="sugerencias-box"></div>
                     </div>
-                    
+
                     <input type="text" id="t-nombre" placeholder="Nombre Completo" required>
                     <input type="text" id="t-empresa" placeholder="Empresa" required>
                     <input type="text" id="t-patente" placeholder="Patente" required>
@@ -51,9 +56,9 @@
             </section>
 
             <section id="sec-visitas" class="tab-content" style="display:none;">
-                <form id="form-visitas">
+                <form id="form-visitas" autocomplete="off">
                     <h2>Ingreso Visitas</h2>
-                    <select id="v-guardia-id" required></select>
+                    <select id="v-guardia-id" required class="select-guardia"></select>
                     <input type="text" id="v-nombre" placeholder="Nombre Visita" required>
                     <input type="text" id="v-rut" placeholder="RUT Visita" required>
                     <input type="text" id="v-empresa" placeholder="Empresa/Motivo" required>
@@ -62,11 +67,6 @@
                 </form>
             </section>
         </main>
-
-        <div class="admin-tools">
-            <button id="btn-gestionar-guardias" class="btn-secondary" style="display:none;">👥 Gestionar Guardias</button>
-            <button id="btn-abrir-reportes" class="btn-secondary" style="display:none;">📊 Reportes Excel</button>
-        </div>
     </div>
 
     <div id="modal-conductor" class="modal">
@@ -79,6 +79,27 @@
                 <button type="submit" class="btn-save">Guardar en Maestro</button>
                 <button type="button" id="btn-cerrar-modal" class="btn-close-text">Cancelar</button>
             </form>
+        </div>
+    </div>
+
+    <div id="modal-reportes" class="modal">
+        <div class="modal-content">
+            <h3>Reportes Excel</h3>
+            <input type="date" id="fecha-inicio">
+            <input type="date" id="fecha-fin">
+            <button id="btn-exportar" class="btn-save">Generar Excel</button>
+            <button type="button" id="btn-cerrar-reportes" class="btn-close-text">Cerrar</button>
+        </div>
+    </div>
+
+    <div id="modal-gestion-guardias" class="modal">
+        <div class="modal-content">
+            <h3>Gestionar Guardias</h3>
+            <input type="text" id="nuevo-guardia-nombre" placeholder="Nombre del nuevo guardia">
+            <button id="btn-add-guardia" class="btn-save">Agregar Guardia</button>
+            <hr>
+            <div id="lista-guardias-admin" style="margin-top:10px; max-height:200px; overflow-y:auto;"></div>
+            <button type="button" id="btn-cerrar-gestion" class="btn-close-text">Cerrar</button>
         </div>
     </div>
 
