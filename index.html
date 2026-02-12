@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Acceso Prosud</title>
+    <title>Control Prosud</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <div id="login-screen">
         <div class="login-card">
-            <h2>🔑 Control de Acceso</h2>
+            <h2>🔑 Acceso</h2>
             <input type="email" id="login-email" placeholder="Correo">
             <input type="password" id="login-password" placeholder="Contraseña">
             <button id="btn-login" class="btn-save">Entrar</button>
@@ -19,7 +19,7 @@
 
     <div id="app-body" style="display:none;">
         <header>
-            <h1>Prosud - Acceso</h1>
+            <h1>Prosud</h1>
             <button id="btn-logout" class="logout-link">Salir</button>
         </header>
 
@@ -29,20 +29,20 @@
         </div>
 
         <main>
-            <div id="admin-panel" style="display:none; justify-content:center; gap:10px; margin:15px 0;">
-                <button id="btn-abrir-reportes" class="btn-new">📊 Reportes Excel</button>
-                <button id="btn-gestionar-guardias" class="btn-new">👥 Gestión Guardias</button>
+            <div id="admin-panel" style="display:none; justify-content:center; gap:10px; margin-bottom:20px;">
+                <button id="btn-abrir-reportes" class="btn-new">📊 Reportes</button>
+                <button id="btn-gestionar-guardias" class="btn-new">👥 Guardias</button>
             </div>
 
-            <section id="sec-transporte" class="tab-content">
-                <form id="form-transporte" autocomplete="off">
+            <section id="sec-transporte">
+                <form id="form-transporte">
                     <h2>Ingreso Transporte</h2>
                     <select id="t-guardia-id" required></select>
                     <div class="autocomplete-container">
                         <input type="text" id="t-rut" placeholder="RUT Conductor" required>
                         <div id="t-sugerencias" class="sugerencias-box"></div>
                     </div>
-                    <input type="text" id="t-nombre" placeholder="Nombre Completo" required>
+                    <input type="text" id="t-nombre" placeholder="Nombre" required>
                     <input type="text" id="t-empresa" placeholder="Empresa" required>
                     <input type="text" id="t-patente" placeholder="Patente" required>
                     <div style="display:flex; gap:10px;">
@@ -52,14 +52,13 @@
                 </form>
             </section>
 
-            <section id="sec-visitas" class="tab-content" style="display:none;">
+            <section id="sec-visitas" style="display:none;">
                 <form id="form-visitas">
                     <h2>Ingreso Visitas</h2>
                     <select id="v-guardia-id" required></select>
                     <input type="text" id="v-nombre" placeholder="Nombre" required>
                     <input type="text" id="v-rut" placeholder="RUT" required>
                     <input type="text" id="v-empresa" placeholder="Motivo" required>
-                    <input type="text" id="v-patente" placeholder="Patente (opcional)">
                     <button type="submit" class="btn-save">Registrar Visita</button>
                 </form>
             </section>
@@ -68,33 +67,33 @@
 
     <div id="modal-conductor" class="modal">
         <div class="modal-content">
-            <h3>Nuevo en Maestro</h3>
+            <h3>Nuevo Maestro</h3>
             <form id="form-maestro">
                 <input type="text" id="m-rut" placeholder="RUT" required>
                 <input type="text" id="m-nombre" placeholder="Nombre" required>
                 <input type="text" id="m-empresa" placeholder="Empresa" required>
                 <button type="submit" class="btn-save">Guardar</button>
-                <button type="button" id="btn-cerrar-modal" class="btn-close-text">Cerrar</button>
+                <button type="button" id="btn-cerrar-modal" class="btn-close-text">Cancelar</button>
             </form>
         </div>
     </div>
 
     <div id="modal-reportes" class="modal">
         <div class="modal-content">
-            <h3>Generar Reporte</h3>
-            <label>Desde:</label><input type="date" id="fecha-inicio">
-            <label>Hasta:</label><input type="date" id="fecha-fin">
-            <button id="btn-exportar" class="btn-save">Descargar Excel</button>
+            <h3>Excel</h3>
+            <input type="date" id="fecha-inicio">
+            <input type="date" id="fecha-fin">
+            <button id="btn-exportar" class="btn-save">Generar</button>
             <button id="btn-cerrar-reportes" class="btn-close-text">Cerrar</button>
         </div>
     </div>
 
     <div id="modal-gestion-guardias" class="modal">
         <div class="modal-content">
-            <h3>Gestión de Guardias</h3>
-            <input type="text" id="nuevo-guardia-nombre" placeholder="Nombre Guardia">
+            <h3>Guardias</h3>
+            <input type="text" id="nuevo-guardia-nombre" placeholder="Nombre">
             <button id="btn-add-guardia" class="btn-save">Agregar</button>
-            <div id="lista-guardias-admin" style="margin-top:15px; text-align:left;"></div>
+            <div id="lista-guardias-admin" style="margin-top:10px;"></div>
             <button id="btn-cerrar-gestion" class="btn-close-text">Cerrar</button>
         </div>
     </div>
