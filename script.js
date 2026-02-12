@@ -19,199 +19,175 @@ setPersistence(auth, browserLocalPersistence);
 
 let maestros = [];
 let listaGuardias = [];
-let maestroPatentes = [];
 
-// --- AUTENTICACIÓN ---
-onAuthStateChanged(auth, (user) => {
+// --- MANEJO DE SESIÓN ---
+onAuthStateChanged(auth, async (user) => {
     if (user) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-body').style.display = 'block';
-        configurarPermisosSeguros(user.email);
-        cargarDatosIniciales();
+        await configurarPermisos(user.email);
+        cargarDatos();
     } else {
         document.getElementById('login-screen').style.display = 'flex';
         document.getElementById('app-body').style.display = 'none';
     }
 });
 
-async function configurarPermisosSeguros(email) {
+async function configurarPermisos(email) {
+    const adminPanel = document.getElementById('admin-panel');
+    const btnGestionar = document.getElementById('btn-gestionar-guardias');
     try {
         const docRef = doc(db, "admins", email);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-            document.getElementById('btn-gestionar-guardias').style.display = 'block';
-            document.getElementById('btn-abrir-reportes').style.display = 'block';
-        } else {
-            document.getElementById('btn-gestionar-guardias').style.display = 'none';
-            document.getElementById('btn-abrir-reportes').style.display = 'none';
+            adminPanel.style.display = 'flex';
+            const data = docSnap.data();
+            btnGestionar.style.display = (data.rol === 'administrador') ? 'block' : 'none';
         }
-    } catch (e) { console.error("Error verificando permisos:", e); }
+    } catch (e) { console.error("Error en permisos", e); }
 }
-
-document.getElementById('btn-login').onclick = async () => {
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-password').value;
-    try { await signInWithEmailAndPassword(auth, email, pass); }
-    catch (e) { alert("Acceso denegado"); }
-};
-
-document.getElementById('btn-logout').onclick = () => signOut(auth);
 
 // --- CARGA DE DATOS ---
-function cargarDatosIniciales() {
+function cargarDatos() {
     onSnapshot(collection(db, "conductores"), (snap) => {
-        maestros = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        maestros = snap.docs.map(d => d.data());
     });
 
-    onSnapshot(collection(db, "guardias"), (snap) => {
+    onSnapshot(collection(db, "lista_guardias"), (snap) => {
         listaGuardias = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        actualizarSelectsGuardias();
-        renderizarListaGestionGuardias();
-    });
-
-    onSnapshot(collection(db, "patentes"), (snap) => {
-        maestroPatentes = snap.docs.map(d => d.data().patente);
+        actualizarSelects();
+        renderizarGuardiasAdmin();
     });
 }
 
-function actualizarSelectsGuardias() {
-    const selects = ['t-guardia-id', 'v-guardia-id'];
-    selects.forEach(id => {
+function actualizarSelects() {
+    ['t-guardia-id', 'v-guardia-id'].forEach(id => {
         const sel = document.getElementById(id);
-        sel.innerHTML = '<option value="">Seleccione Guardia</option>';
+        sel.innerHTML = '<option value="">-- Seleccione Guardia --</option>';
         listaGuardias.forEach(g => {
-            const opt = document.createElement('option');
-            opt.value = g.nombre;
-            opt.textContent = g.nombre;
-            sel.appendChild(opt);
+            sel.innerHTML += `<option value="${g.nombre}">${g.nombre}</option>`;
         });
     });
 }
 
-// --- LÓGICA DE TRANSPORTE (CON CAMPOS OBLIGATORIOS) ---
-const tRut = document.getElementById('t-rut');
-const tNombre = document.getElementById('t-nombre');
-const tEmpresa = document.getElementById('t-empresa');
-const tSugerencias = document.getElementById('t-sugerencias');
+// --- FORMATEO RUT ---
+function formatearRUT(rut) {
+    let v = rut.replace(/[^\dkK]/g, "");
+    if (v.length > 1) v = v.slice(0, -1) + "-" + v.slice(-1);
+    return v.toUpperCase();
+}
 
-tRut.oninput = (e) => {
+// --- AUTOCOMPLETADO ---
+document.getElementById('t-rut').oninput = (e) => {
     const val = e.target.value = formatearRUT(e.target.value);
-    tSugerencias.innerHTML = '';
-    if (val.length > 3) {
-        const filtrados = maestros.filter(m => m.rut.includes(val));
-        filtrados.forEach(m => {
-            const div = document.createElement('div');
-            div.className = 'sugerencia-item';
-            div.textContent = `${m.rut} - ${m.nombre}`;
-            div.onclick = () => {
-                tRut.value = m.rut;
-                tNombre.value = m.nombre;
-                tEmpresa.value = m.empresa;
-                tSugerencias.innerHTML = '';
-            };
-            tSugerencias.appendChild(div);
-        });
-    }
+    const box = document.getElementById('t-sugerencias');
+    box.innerHTML = "";
+    if (val.length < 3) return;
+    maestros.filter(m => m.rut.startsWith(val)).forEach(m => {
+        const d = document.createElement('div');
+        d.className = 'sugerencia-item';
+        d.textContent = `${m.rut} | ${m.nombre}`;
+        d.onclick = () => {
+            document.getElementById('t-rut').value = m.rut;
+            document.getElementById('t-nombre').value = m.nombre;
+            document.getElementById('t-empresa').value = m.empresa;
+            box.innerHTML = "";
+        };
+        box.appendChild(d);
+    });
 };
 
+// --- GUARDAR REGISTROS ---
 document.getElementById('form-transporte').onsubmit = async (e) => {
     e.preventDefault();
-    const rut = tRut.value.trim();
-    const nombre = tNombre.value.trim();
-    const empresa = tEmpresa.value.trim();
-    const pat = document.getElementById('t-patente').value.trim();
+    const nombre = document.getElementById('t-nombre').value.trim();
+    const empresa = document.getElementById('t-empresa').value.trim();
+    if(!nombre || !empresa) return alert("Nombre y Empresa son obligatorios");
 
-    // CANDADO: No permite guardar si faltan datos esenciales
-    if (!rut || !nombre || !empresa) {
-        alert("❌ ERROR: El RUT, Nombre y Empresa son obligatorios.");
-        return;
-    }
-
-    await guardarRegistro({
+    const ahora = new Date();
+    await addDoc(collection(db, "ingresos"), {
         tipo: "TRANSPORTE",
         guardia: document.getElementById('t-guardia-id').value,
-        rut, nombre, empresa, patente: pat
+        rut: document.getElementById('t-rut').value,
+        nombre, empresa,
+        patente: document.getElementById('t-patente').value,
+        fecha: ahora.toLocaleDateString('es-CL'),
+        hora: ahora.toLocaleTimeString('es-CL'),
+        fechaFiltro: ahora.toISOString().split('T')[0]
     });
-    await aprenderPatente(pat);
+    alert("✅ Registro exitoso");
     e.target.reset();
 };
 
-// --- LÓGICA DE MAESTRO (CON DETECCIÓN DE DUPLICADOS) ---
+// --- MAESTRO SIN DUPLICADOS ---
 document.getElementById('form-maestro').onsubmit = async (e) => {
     e.preventDefault();
     const rut = document.getElementById('m-rut').value.trim();
-    const nombre = document.getElementById('m-nombre').value.trim();
-    const empresa = document.getElementById('m-empresa').value.trim();
+    const q = query(collection(db, "conductores"), where("rut", "==", rut));
+    const snap = await getDocs(q);
+    if (!snap.empty) return alert("⚠️ Ya existe este RUT en el maestro");
 
-    if (!rut || !nombre || !empresa) {
-        alert("❌ Todos los campos son obligatorios.");
-        return;
-    }
-
-    try {
-        // BUSCAR DUPLICADO
-        const q = query(collection(db, "conductores"), where("rut", "==", rut));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-            alert(`⚠️ El conductor con RUT ${rut} ya está registrado.`);
-            return;
-        }
-
-        await addDoc(collection(db, "conductores"), { rut, nombre, empresa });
-        alert("✅ Conductor agregado exitosamente.");
-        e.target.reset();
-        document.getElementById('modal-conductor').style.display = 'none';
-    } catch (error) {
-        alert("Error al procesar el maestro.");
-    }
+    await addDoc(collection(db, "conductores"), {
+        rut,
+        nombre: document.getElementById('m-nombre').value.trim(),
+        empresa: document.getElementById('m-empresa').value.trim()
+    });
+    alert("✅ Guardado");
+    document.getElementById('modal-conductor').style.display = 'none';
+    e.target.reset();
 };
 
-// --- FUNCIONES AUXILIARES ---
-async function guardarRegistro(datos) {
-    try {
-        await addDoc(collection(db, "ingresos"), {
-            ...datos,
-            fecha: new Date().toLocaleDateString('es-CL'),
-            hora: new Date().toLocaleTimeString('es-CL')
-        });
-        alert("Registro Guardado");
-    } catch (e) { alert("Error al guardar"); }
-}
+// --- EXPORTAR EXCEL ---
+document.getElementById('btn-exportar').onclick = async () => {
+    const inicio = document.getElementById('fecha-inicio').value;
+    const fin = document.getElementById('fecha-fin').value;
+    if(!inicio || !fin) return alert("Seleccione fechas");
 
-async function aprenderPatente(p) {
-    if (p && !maestroPatentes.includes(p)) {
-        await addDoc(collection(db, "patentes"), { patente: p });
-    }
-}
+    const snap = await getDocs(collection(db, "ingresos"));
+    const datos = snap.docs.map(d => d.data()).filter(r => r.fechaFiltro >= inicio && r.fechaFiltro <= fin);
+    
+    if(datos.length === 0) return alert("No hay datos en ese rango");
 
-function formatearRUT(rut) {
-    let valor = rut.replace(/\./g, '').replace('-', '');
-    if (valor.length < 2) return valor;
-    let cuerpo = valor.slice(0, -1);
-    let dv = valor.slice(-1).toUpperCase();
-    return cuerpo + '-' + dv;
-}
+    const ws = XLSX.utils.json_to_sheet(datos);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ingresos");
+    XLSX.writeFile(wb, "Reporte_Prosud.xlsx");
+};
 
-// --- GESTIÓN DE MODALES Y TABS ---
+// --- GESTIÓN GUARDIAS ---
+function renderizarGuardiasAdmin() {
+    const div = document.getElementById('lista-guardias-admin');
+    div.innerHTML = "";
+    listaGuardias.forEach(g => {
+        const item = document.createElement('div');
+        item.innerHTML = `${g.nombre} <button onclick="window.eliminarG('${g.id}')" style="color:red; float:right;">✖</button>`;
+        div.appendChild(item);
+    });
+}
+window.eliminarG = async (id) => { if(confirm("¿Eliminar?")) await deleteDoc(doc(db, "lista_guardias", id)); };
+
+document.getElementById('btn-add-guardia').onclick = async () => {
+    const n = document.getElementById('nuevo-guardia-nombre');
+    if(n.value) await addDoc(collection(db, "lista_guardias"), { nombre: n.value });
+    n.value = "";
+};
+
+// --- BOTONES Y MODALES ---
 document.getElementById('btn-tab-transporte').onclick = () => {
     document.getElementById('sec-transporte').style.display='block';
     document.getElementById('sec-visitas').style.display='none';
-    document.getElementById('btn-tab-transporte').classList.add('active');
-    document.getElementById('btn-tab-visitas').classList.remove('active');
 };
 document.getElementById('btn-tab-visitas').onclick = () => {
     document.getElementById('sec-visitas').style.display='block';
     document.getElementById('sec-transporte').style.display='none';
-    document.getElementById('btn-tab-visitas').classList.add('active');
-    document.getElementById('btn-tab-transporte').classList.remove('active');
 };
-
-document.getElementById('btn-gestionar-guardias').onclick = () => document.getElementById('modal-gestion-guardias').style.display='flex';
-document.getElementById('btn-cerrar-gestion').onclick = () => document.getElementById('modal-gestion-guardias').style.display='none';
-document.getElementById('btn-abrir-reportes').onclick = () => document.getElementById('modal-reportes').style.display='flex';
-document.getElementById('btn-cerrar-reportes').onclick = () => document.getElementById('modal-reportes').style.display='none';
 document.getElementById('btn-abrir-modal').onclick = () => document.getElementById('modal-conductor').style.display='flex';
 document.getElementById('btn-cerrar-modal').onclick = () => document.getElementById('modal-conductor').style.display='none';
-
-document.getElementById('m-rut').oninput = (e) => e.target.value = formatearRUT(e.target.value);
+document.getElementById('btn-abrir-reportes').onclick = () => document.getElementById('modal-reportes').style.display='flex';
+document.getElementById('btn-cerrar-reportes').onclick = () => document.getElementById('modal-reportes').style.display='none';
+document.getElementById('btn-gestionar-guardias').onclick = () => document.getElementById('modal-gestion-guardias').style.display='flex';
+document.getElementById('btn-cerrar-gestion').onclick = () => document.getElementById('modal-gestion-guardias').style.display='none';
+document.getElementById('btn-login').onclick = () => {
+    signInWithEmailAndPassword(auth, document.getElementById('login-email').value, document.getElementById('login-password').value).catch(()=>alert("Error"));
+};
+document.getElementById('btn-logout').onclick = () => signOut(auth);
