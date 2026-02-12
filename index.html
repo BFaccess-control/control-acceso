@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Prosud</title>
+    <title>Control Acceso Prosud</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <div id="login-screen">
         <div class="login-card">
-            <h2>🔑 Acceso</h2>
-            <input type="email" id="login-email" placeholder="Correo">
-            <input type="password" id="login-password" placeholder="Contraseña">
-            <button id="btn-login" class="btn-save">Entrar</button>
+            <h2>🔑 Control de Acceso</h2>
+            <input type="email" id="login-email" placeholder="Correo" autocomplete="off">
+            <input type="password" id="login-password" placeholder="Contraseña" autocomplete="off">
+            <button id="btn-login" class="btn-save">Entrar al Sistema</button>
         </div>
     </div>
 
     <div id="app-body" style="display:none;">
         <header>
-            <h1>Prosud</h1>
-            <button id="btn-logout" class="logout-link">Salir</button>
+            <h1>Control Prosud</h1>
+            <button id="btn-logout" class="logout-link">Cerrar Sesión</button>
         </header>
 
         <div class="tabs">
@@ -29,45 +29,79 @@
         </div>
 
         <main>
-            <div id="admin-panel" style="display:none; justify-content:center; gap:10px; margin-bottom:20px;">
-                <button id="btn-abrir-reportes" class="btn-new">📊 Reportes</button>
-                <button id="btn-gestionar-guardias" class="btn-new">👥 Guardias</button>
+            <div id="admin-panel" style="display:none; margin-bottom:15px; gap:10px; display:flex; flex-direction:column;">
+                <button id="btn-abrir-reportes" class="btn-new">📊 Reportes Excel</button>
+                <button id="btn-gestionar-guardias" class="btn-new" style="display:none;">👥 Gestionar Guardias</button>
             </div>
 
-            <section id="sec-transporte">
-                <form id="form-transporte">
+            <section id="sec-transporte" class="tab-content active">
+                <form id="form-transporte" autocomplete="off">
                     <h2>Ingreso Transporte</h2>
-                    <select id="t-guardia-id" required></select>
+                    <select id="t-guardia-id" required class="select-guardia"><option value="">Cargando...</option></select>
+                    
                     <div class="autocomplete-container">
                         <input type="text" id="t-rut" placeholder="RUT Conductor" required>
                         <div id="t-sugerencias" class="sugerencias-box"></div>
                     </div>
-                    <input type="text" id="t-nombre" placeholder="Nombre" required>
-                    <input type="text" id="t-empresa" placeholder="Empresa" required>
-                    <input type="text" id="t-patente" placeholder="Patente" required>
-                    <div style="display:flex; gap:10px;">
-                        <button type="submit" class="btn-save" style="flex:2;">Registrar</button>
-                        <button type="button" id="btn-abrir-modal" class="btn-new" style="flex:1;">+ Maestro</button>
+
+                    <input type="text" id="t-nombre" placeholder="Nombre" readonly class="readonly">
+                    <input type="text" id="t-empresa" placeholder="Empresa" readonly class="readonly">
+                    
+                    <div class="autocomplete-container">
+                        <input type="text" id="t-patente" placeholder="Patente (ej: ABCD-12)" required>
+                        <div id="p-sugerencias" class="sugerencias-box"></div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn-save">Guardar</button>
+                        <button type="button" id="btn-abrir-modal" class="btn-new"> Agregar nuevo conductor </button>
                     </div>
                 </form>
             </section>
 
-            <section id="sec-visitas" style="display:none;">
-                <form id="form-visitas">
-                    <h2>Ingreso Visitas</h2>
-                    <select id="v-guardia-id" required></select>
-                    <input type="text" id="v-nombre" placeholder="Nombre" required>
-                    <input type="text" id="v-rut" placeholder="RUT" required>
-                    <input type="text" id="v-empresa" placeholder="Motivo" required>
-                    <button type="submit" class="btn-save">Registrar Visita</button>
+            <section id="sec-visitas" class="tab-content" style="display:none;">
+                <form id="form-visitas" autocomplete="off">
+                    <h2>Registro Visita</h2>
+                    <select id="v-guardia-id" required class="select-guardia"><option value="">Cargando...</option></select>
+                    
+                    <div class="autocomplete-container">
+                        <input type="text" id="v-rut" placeholder="RUT Visita" required>
+                        <div id="v-sugerencias-rut" class="sugerencias-box"></div>
+                    </div>
+
+                    <input type="text" id="v-nombre" placeholder="Nombre Completo" required>
+                    <input type="text" id="v-representa" placeholder="Empresa a la que representa" required>
+                    <input type="text" id="v-motivo" placeholder="Motivo de la visita" required>
+                    
+                    <div class="toggle-container">
+                        <span>¿Viene en vehículo?</span>
+                        <input type="checkbox" id="v-check-vehiculo">
+                    </div>
+
+                    <div class="autocomplete-container">
+                        <input type="text" id="v-patente" placeholder="Patente" style="display:none;">
+                        <div id="v-sugerencias-patente" class="sugerencias-box"></div>
+                    </div>
+
+                    <button type="submit" class="btn-save">Guardar Visita</button>
                 </form>
             </section>
         </main>
     </div>
 
+    <div id="modal-gestion-guardias" class="modal">
+        <div class="modal-content">
+            <h3>👥 Lista de Guardias</h3>
+            <div id="lista-guardias-admin" style="max-height: 180px; overflow-y: auto; border: 1px solid #ddd; margin-bottom: 10px;"></div>
+            <input type="text" id="nuevo-guardia-nombre" placeholder="Nombre guardia">
+            <button id="btn-add-guardia" class="btn-save">Agregar</button>
+            <button type="button" id="btn-cerrar-gestion" class="btn-close-text">Cerrar</button>
+        </div>
+    </div>
+
     <div id="modal-conductor" class="modal">
         <div class="modal-content">
-            <h3>Nuevo Maestro</h3>
+            <h3>Registrar en Maestro</h3>
             <form id="form-maestro">
                 <input type="text" id="m-rut" placeholder="RUT" required>
                 <input type="text" id="m-nombre" placeholder="Nombre" required>
@@ -80,21 +114,18 @@
 
     <div id="modal-reportes" class="modal">
         <div class="modal-content">
-            <h3>Excel</h3>
-            <input type="date" id="fecha-inicio">
-            <input type="date" id="fecha-fin">
-            <button id="btn-exportar" class="btn-save">Generar</button>
-            <button id="btn-cerrar-reportes" class="btn-close-text">Cerrar</button>
-        </div>
-    </div>
-
-    <div id="modal-gestion-guardias" class="modal">
-        <div class="modal-content">
-            <h3>Guardias</h3>
-            <input type="text" id="nuevo-guardia-nombre" placeholder="Nombre">
-            <button id="btn-add-guardia" class="btn-save">Agregar</button>
-            <div id="lista-guardias-admin" style="margin-top:10px;"></div>
-            <button id="btn-cerrar-gestion" class="btn-close-text">Cerrar</button>
+            <h3>Reportes Excel</h3>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <select id="filtro-tipo">
+                    <option value="TODOS">Todos</option>
+                    <option value="TRANSPORTE">Transporte</option>
+                    <option value="VISITA">Visitas</option>
+                </select>
+                <input type="date" id="fecha-inicio">
+                <input type="date" id="fecha-fin">
+                <button id="btn-exportar" class="btn-excel">Generar Excel</button>
+                <button type="button" id="btn-cerrar-reportes" class="btn-close-text">Cerrar</button>
+            </div>
         </div>
     </div>
 
