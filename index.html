@@ -26,8 +26,9 @@
         <div class="tabs">
             <button class="tab-btn active" id="btn-tab-transporte">🚍 Transporte</button>
             <button class="tab-btn" id="btn-tab-visitas">🧍 Visitas</button>
+            <button class="tab-btn" id="btn-tab-abastecimiento">📦 Abastecimiento</button>
         </div>
-
+        
         <main>
             <div id="admin-panel" style="display:none; margin-bottom:15px; gap:10px; display:flex; flex-direction:column;">
                 <button id="btn-abrir-reportes" class="btn-new">📊 Reportes Excel</button>
@@ -37,15 +38,17 @@
             <section id="sec-transporte" class="tab-content active">
                 <form id="form-transporte" autocomplete="off">
                     <h2>Ingreso Transporte</h2>
-                    <select id="t-guardia-id" required class="select-guardia"><option value="">Cargando...</option></select>
+                    <select id="t-guardia-id" required class="select-guardia">
+                        <option value="">-- Seleccione Guardia --</option>
+                    </select>
                     
                     <div class="autocomplete-container">
                         <input type="text" id="t-rut" placeholder="RUT Conductor" required>
                         <div id="t-sugerencias" class="sugerencias-box"></div>
                     </div>
 
-                    <input type="text" id="t-nombre" placeholder="Nombre" readonly class="readonly">
-                    <input type="text" id="t-empresa" placeholder="Empresa" readonly class="readonly">
+                    <input type="text" id="t-nombre" placeholder="Nombre" readonly class="readonly" required>
+                    <input type="text" id="t-empresa" placeholder="Empresa" readonly class="readonly" required>
                     
                     <div class="autocomplete-container">
                         <input type="text" id="t-patente" placeholder="Patente (ej: ABCD-12)" required>
@@ -54,7 +57,7 @@
 
                     <div class="button-group">
                         <button type="submit" class="btn-save">Guardar</button>
-                        <button type="button" id="btn-abrir-modal" class="btn-new"> Agregar nuevo conductor </button>
+                        <button type="button" id="btn-abrir-modal" class="btn-new">Agregar nuevo conductor</button>
                     </div>
                 </form>
             </section>
@@ -62,7 +65,9 @@
             <section id="sec-visitas" class="tab-content" style="display:none;">
                 <form id="form-visitas" autocomplete="off">
                     <h2>Registro Visita</h2>
-                    <select id="v-guardia-id" required class="select-guardia"><option value="">Cargando...</option></select>
+                    <select id="v-guardia-id" required class="select-guardia">
+                        <option value="">-- Seleccione Guardia --</option>
+                    </select>
                     
                     <div class="autocomplete-container">
                         <input type="text" id="v-rut" placeholder="RUT Visita" required>
@@ -85,6 +90,52 @@
 
                     <button type="submit" class="btn-save">Guardar Visita</button>
                 </form>
+            </section>
+
+            <section id="sec-abastecimiento" style="display:none;">
+                <form id="form-abastecimiento" class="registro-form">
+                    <h2>Ingreso Abastecimiento</h2>
+                    
+                    <select id="a-guardia-id" required class="select-guardia">
+                        <option value="">-- Seleccione Guardia --</option>
+                    </select>
+
+                    <div class="autocomplete-container">
+                        <input type="text" id="a-rut" placeholder="RUT Conductor" required autocomplete="off">
+                        <div id="a-sugerencias-rut" class="sugerencias-box"></div>
+                    </div>
+
+                    <input type="text" id="a-nombre" placeholder="Nombre Completo" required autocomplete="off">
+
+                    <input type="text" id="a-guia" placeholder="Número de Guía" required>
+
+                    <div class="autocomplete-container">
+                        <input type="text" id="a-patente" placeholder="Patente Camión (ABCD-12)" required autocomplete="off">
+                        <div id="a-sugerencias-patente" class="sugerencias-box"></div>
+                    </div>
+
+                    <div class="autocomplete-container">
+                        <input type="text" id="a-rampla" placeholder="Patente Rampla" autocomplete="off">
+                        <div id="a-sugerencias-rampla" class="sugerencias-box"></div>
+                    </div>
+
+                    <button type="submit" class="btn-save" style="width: 100%; margin-top: 10px;">Registrar Ingreso</button>
+                </form>
+
+                <div class="recinto-container" style="margin-top: 30px;">
+                    <h3 style="color: #2c3e50; margin-bottom: 10px; text-align: center;">🚚 Camiones en Recinto</h3>
+                    <table class="tabla-gestion">
+                        <thead>
+                            <tr>
+                                <th>Conductor / RUT</th>
+                                <th>Patentes (C/R)</th>
+                                <th>Ingreso</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-abastecimiento-recinto"></tbody>
+                    </table>
+                </div>
             </section>
         </main>
     </div>
@@ -112,23 +163,30 @@
         </div>
     </div>
 
-    <div id="modal-reportes" class="modal">
+    <div id="modal-reportes" class="modal" style="display: none;">
         <div class="modal-content">
-            <h3>Reportes Excel</h3>
-            <div style="display:flex; flex-direction:column; gap:10px;">
+            <h3>📊 Exportar Reportes Excel</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                <label>Fecha Inicio:</label>
+                <input type="date" id="fecha-inicio" required>
+                <label>Fecha Fin:</label>
+                <input type="date" id="fecha-fin" required>
+                <label>Tipo de Registro:</label>
                 <select id="filtro-tipo">
-                    <option value="TODOS">Todos</option>
+                    <option value="TODOS">Todos los registros</option>
                     <option value="TRANSPORTE">Transporte</option>
-                    <option value="VISITA">Visitas</option>
+                    <option value="VISITAS">Visitas</option>
+                    <option value="ABASTECIMIENTO">Abastecimiento</option> 
                 </select>
-                <input type="date" id="fecha-inicio">
-                <input type="date" id="fecha-fin">
-                <button id="btn-exportar" class="btn-excel">Generar Excel</button>
-                <button type="button" id="btn-cerrar-reportes" class="btn-close-text">Cerrar</button>
+            </div>
+            
+            <div class="modal-footer" style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                <button id="btn-exportar" class="btn-save">Generar Excel</button>
+                <button id="btn-cerrar-reportes" class="btn-cancel">Cerrar</button>
             </div>
         </div>
     </div>
 
-    <script type="module" src="script.js"></script>
+   <script type="module" src="jsapp.js"></script>
 </body>
 </html>
