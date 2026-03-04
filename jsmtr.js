@@ -33,8 +33,6 @@ export function activarAutocompletadoRUT(idInput, idBox) {
         const box = document.getElementById(idBox);
         box.innerHTML = "";
 
-        // Si el usuario borra o cambia el RUT, por seguridad desbloqueamos campos 
-        // para que no se queden bloqueados con datos viejos
         gestionarBloqueoCampos(idInput, false);
 
         if (bLimpia.length < 3) return;
@@ -57,7 +55,6 @@ export function activarAutocompletadoRUT(idInput, idBox) {
                     document.getElementById('a-nombre').value = p.nombre;
                 }
                 box.innerHTML = "";
-                // Como el conductor existe, bloqueamos para evitar errores de tipeo
                 gestionarBloqueoCampos(idInput, true);
             };
             box.appendChild(d);
@@ -65,12 +62,9 @@ export function activarAutocompletadoRUT(idInput, idBox) {
     };
 }
 
-// Función auxiliar para bloquear/desbloquear según si el conductor existe
 function gestionarBloqueoCampos(idInput, bloquear) {
-    const sufijos = idInput.split('-')[0]; // 't', 'v' o 'a'
+    const sufijos = idInput.split('-')[0]; 
     const nombre = document.getElementById(`${sufijos}-nombre`);
-    const empresa = document.getElementById(sufijos === 't' ? 't-empresa' : (sufijos === 'v' ? 'v-representa' : 'a-nombre'));
-
     if (nombre) {
         nombre.readOnly = bloquear;
         bloquear ? nombre.classList.add('readonly') : nombre.classList.remove('readonly');
@@ -133,12 +127,11 @@ window.borrarG = async (id) => { if(confirm("¿Eliminar?")) await deleteDoc(doc(
 
 // --- GUARDADO DE REGISTROS CON VALIDACIÓN ---
 export const guardarRegistro = async (data) => {
-    // Misión Secundaria: Evitar campos vacíos
     const camposObligatorios = ['rut', 'nombre', 'guardia', 'patente'];
     const faltantes = camposObligatorios.filter(campo => !data[campo] || data[campo].trim() === "");
 
     if (faltantes.length > 0) {
-        alert("❌ Error: Faltan datos obligatorios (RUT, Nombre, Guardia o Patente). El registro no se guardará.");
+        alert("❌ Error: Faltan datos obligatorios (RUT, Nombre, Guardia o Patente).");
         return; 
     }
 
@@ -147,6 +140,7 @@ export const guardarRegistro = async (data) => {
     const mes = String(ahora.getMonth() + 1).padStart(2, '0');
     const dia = String(ahora.getDate()).padStart(2, '0');
     
+    // Guardamos en formato YYYY-MM-DD para consistencia futura
     data.fecha = `${anio}-${mes}-${dia}`;
     data.hora = ahora.toLocaleTimeString('es-CL', { hour12: false });
     
@@ -164,12 +158,21 @@ export const aprenderPatente = async (pat) => {
     }
 };
 
-// --- EXPORTACIÓN A EXCEL CORREGIDA ---
+// --- EXPORTACIÓN A EXCEL CON NORMALIZACIÓN DE FECHAS (URGENCIA FEBRERO) ---
 export const exportarExcel = async (inicio, fin, tipoF) => {
     const snap = await getDocs(collection(db, "ingresos"));
     
     let filtrados = snap.docs.map(d => d.data()).filter(r => {
-        const cF = r.fecha >= inicio && r.fecha <= fin;
+        if (!r.fecha) return false;
+
+        // Normalizar fecha del registro para la comparación (DD-MM-YYYY -> YYYY-MM-DD)
+        let fechaComp = r.fecha;
+        if (r.fecha.includes("-") && r.fecha.split("-")[0].length === 2) {
+            const [d, m, a] = r.fecha.split("-");
+            fechaComp = `${a}-${m}-${d}`;
+        }
+
+        const cF = fechaComp >= inicio && fechaComp <= fin;
         const cT = (tipoF === "TODOS") || (r.tipo === tipoF);
         return cF && cT;
     });
@@ -178,7 +181,12 @@ export const exportarExcel = async (inicio, fin, tipoF) => {
         return alert(`Sin datos para el rango ${inicio} al ${fin} en ${tipoF}`);
     }
     
-    filtrados.sort((a, b) => (a.fecha + (a.hora || a.horaIngreso)).localeCompare(b.fecha + (b.hora || b.horaIngreso)));
+    // Ordenar cronológicamente usando la fecha normalizada
+    filtrados.sort((a, b) => {
+        const fA = a.fecha.includes("-") && a.fecha.split("-")[0].length === 2 ? a.fecha.split("-").reverse().join("-") : a.fecha;
+        const fB = b.fecha.includes("-") && b.fecha.split("-")[0].length === 2 ? b.fecha.split("-").reverse().join("-") : b.fecha;
+        return (fA + (a.hora || a.horaIngreso)).localeCompare(fB + (b.hora || b.horaIngreso));
+    });
     
     const datosOrdenados = filtrados.map(r => {
         const fila = { 
@@ -196,6 +204,7 @@ export const exportarExcel = async (inicio, fin, tipoF) => {
         if (r.empresa) fila["Empresa"] = r.empresa;
         if (r.guia) fila["Guía"] = r.guia;
         if (r.rampla) fila["Rampla"] = r.rampla;
+        if (r.sello) fila["Sello"] = r.sello;
         return fila;
     });
 
