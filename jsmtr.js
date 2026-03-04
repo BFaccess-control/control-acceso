@@ -93,4 +93,62 @@ export const cargarGuardiasYListados = async () => {
         listaGuardias = docs.map(d => ({id: d.id, ...d.data()}));
         let opciones = '<option value="">-- Seleccione Guardia --</option>';
         listaGuardias.forEach(g => { opciones += `<option value="${g.nombre}">${g.nombre}</option>`; });
-        ['t-guardia-id', 'v-guardia-id', 'a-guardia
+        ['t-guardia-id', 'v-guardia-id', 'a-guardia-id'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = opciones;
+        });
+    };
+    const inicialSnap = await getDocs(colRef);
+    renderizar(inicialSnap.docs);
+    onSnapshot(colRef, (s) => { renderizar(s.docs); });
+};
+
+window.borrarG = async (id) => { if(confirm("¿Eliminar?")) await deleteDoc(doc(db, "lista_guardias", id)); };
+
+// --- GUARDADO ---
+export const guardarRegistro = async (data) => {
+    const ahora = new Date();
+    data.fecha = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}`;
+    data.hora = ahora.toLocaleTimeString('es-CL', { hour12: false });
+    try {
+        await addDoc(collection(db, "ingresos"), data);
+        alert("✅ Registro guardado");
+    } catch (e) { alert("Error: " + e.message); }
+};
+
+// --- EXPORTACIÓN REFORZADA (SOLUCIÓN FEBRERO) ---
+export const exportarExcel = async (inicio, fin, tipoF) => {
+    const snap = await getDocs(collection(db, "ingresos"));
+    
+    let filtrados = snap.docs.map(d => d.data()).filter(r => {
+        if (!r.fecha) return false;
+        
+        // Normalización para comparar (DD-MM-YYYY a YYYY-MM-DD)
+        let fComp = r.fecha;
+        if (r.fecha.includes("-") && r.fecha.split("-")[0].length === 2) {
+            const [d, m, a] = r.fecha.split("-");
+            fComp = `${a}-${m}-${d}`;
+        }
+        
+        return (fComp >= inicio && fComp <= fin) && (tipoF === "TODOS" || r.tipo === tipoF);
+    });
+
+    if(filtrados.length === 0) return alert(`Sin datos para el rango ${inicio} al ${fin}`);
+
+    const datosExcel = filtrados.map(r => ({
+        "Fecha": r.fecha,
+        "H. Ingreso": r.hora || r.horaIngreso,
+        "Tipo": r.tipo,
+        "Nombre": r.nombre,
+        "Rut": r.rut,
+        "Patente": r.patente,
+        "Empresa": r.empresa || "",
+        "Guía": r.guia || "",
+        "Sello": r.sello || ""
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(datosExcel);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+    XLSX.writeFile(wb, `Reporte_${tipoF}_${inicio}.xlsx`);
+};
