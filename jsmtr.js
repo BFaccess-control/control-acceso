@@ -17,7 +17,7 @@ export const formatearPatente = (val) => {
     return v.substring(0, 7);
 };
 
-// --- SUSCRIPCIONES A MAESTROS ---
+// --- SUSCRIPCIONES ---
 onSnapshot(collection(db, "conductores"), (s) => { maestros = s.docs.map(d => d.data()); });
 onSnapshot(collection(db, "vehiculos"), (s) => { maestroPatentes = s.docs.map(d => d.data()); });
 
@@ -89,7 +89,7 @@ export const cargarGuardiasYListados = async () => {
     onSnapshot(colRef, (s) => renderizar(s.docs));
 };
 
-// --- GUARDADO UNIFICADO A DD-MM-YYYY ---
+// --- GUARDADO UNIFICADO (CHILE DD-MM-YYYY) ---
 export const guardarRegistro = async (data) => {
     const n = new Date();
     const dia = String(n.getDate()).padStart(2, '0');
@@ -99,16 +99,37 @@ export const guardarRegistro = async (data) => {
     
     try {
         await addDoc(collection(db, "ingresos"), data);
-        alert("✅ Registro guardado (Formato Chile)");
+        alert("✅ Registro guardado (Formato DD-MM-YYYY)");
     } catch (e) { alert("Error: " + e.message); }
 };
 
-// --- FUNCIÓN PARA EL MAESTRO DE PATENTES ---
+// --- FUNCIÓN RECUPERADA (LA QUE FALTABA PARA JSTTE.JS) ---
 export const aprenderPatente = async (pat) => {
     if (pat && pat.length >= 6 && !maestroPatentes.some(p => p.patente === pat)) {
         await addDoc(collection(db, "vehiculos"), { patente: pat });
     }
 };
 
-// --- EXCEL (TRADUCTOR DE FORMATOS) ---
-export const exportarExcel = async (inicio, fin
+// --- EXCEL ---
+export const exportarExcel = async (inicio, fin, tipoF) => {
+    try {
+        const snap = await getDocs(collection(db, "ingresos"));
+        const filtrados = snap.docs.map(d => d.data()).filter(r => {
+            if (!r.fecha) return false;
+            let f = r.fecha;
+            // Traductor: Si la fecha guardada es DD-MM-YYYY, la invertimos para el filtro del calendario
+            if (f.includes("-") && f.split("-")[0].length === 2) {
+                const [d, m, a] = f.split("-");
+                f = `${a}-${m}-${d}`;
+            }
+            return (f >= inicio && f <= fin) && (tipoF === "TODOS" || r.tipo === tipoF);
+        });
+
+        if(filtrados.length === 0) return alert("Sin datos en este rango.");
+
+        const ws = XLSX.utils.json_to_sheet(filtrados);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+        XLSX.writeFile(wb, `Reporte_Prosud.xlsx`);
+    } catch (e) { alert("Error Excel: " + e.message); }
+};
