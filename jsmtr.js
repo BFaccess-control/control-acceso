@@ -17,7 +17,7 @@ export const formatearPatente = (val) => {
     return v.substring(0, 7);
 };
 
-// --- MAESTROS ---
+// --- SUSCRIPCIONES A MAESTROS ---
 onSnapshot(collection(db, "conductores"), (s) => { maestros = s.docs.map(d => d.data()); });
 onSnapshot(collection(db, "vehiculos"), (s) => { maestroPatentes = s.docs.map(d => d.data()); });
 
@@ -89,34 +89,26 @@ export const cargarGuardiasYListados = async () => {
     onSnapshot(colRef, (s) => renderizar(s.docs));
 };
 
-// --- REGISTRO ---
+// --- GUARDADO UNIFICADO A DD-MM-YYYY ---
 export const guardarRegistro = async (data) => {
     const n = new Date();
-    data.fecha = `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+    const dia = String(n.getDate()).padStart(2, '0');
+    const mes = String(n.getMonth() + 1).padStart(2, '0');
+    data.fecha = `${dia}-${mes}-${n.getFullYear()}`;
     data.hora = n.toLocaleTimeString('es-CL', { hour12: false });
+    
     try {
         await addDoc(collection(db, "ingresos"), data);
-        alert("✅ Guardado");
+        alert("✅ Registro guardado (Formato Chile)");
     } catch (e) { alert("Error: " + e.message); }
 };
 
-// --- EXCEL ---
-export const exportarExcel = async (inicio, fin, tipoF) => {
-    try {
-        const snap = await getDocs(collection(db, "ingresos"));
-        const filtrados = snap.docs.map(d => d.data()).filter(r => {
-            if (!r.fecha) return false;
-            let f = r.fecha;
-            if (f.includes("-") && f.split("-")[0].length === 2) {
-                const [d, m, a] = f.split("-");
-                f = `${a}-${m}-${d}`;
-            }
-            return (f >= inicio && f <= fin) && (tipoF === "TODOS" || r.tipo === tipoF);
-        });
-        if(filtrados.length === 0) return alert("Sin datos");
-        const ws = XLSX.utils.json_to_sheet(filtrados);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Reporte");
-        XLSX.writeFile(wb, `Reporte.xlsx`);
-    } catch (e) { alert("Error Excel: " + e.message); }
+// --- FUNCIÓN PARA EL MAESTRO DE PATENTES ---
+export const aprenderPatente = async (pat) => {
+    if (pat && pat.length >= 6 && !maestroPatentes.some(p => p.patente === pat)) {
+        await addDoc(collection(db, "vehiculos"), { patente: pat });
+    }
 };
+
+// --- EXCEL (TRADUCTOR DE FORMATOS) ---
+export const exportarExcel = async (inicio, fin
