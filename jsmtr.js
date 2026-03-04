@@ -26,17 +26,14 @@ onSnapshot(collection(db, "vehiculos"), (snap) => { maestroPatentes = snap.docs.
 export function activarAutocompletadoRUT(idInput, idBox) {
     const input = document.getElementById(idInput);
     if (!input) return;
-    
     input.oninput = (e) => {
         const val = e.target.value = formatearRUT(e.target.value);
         const bLimpia = val.replace(/-/g, "");
         const box = document.getElementById(idBox);
         box.innerHTML = "";
         gestionarBloqueoCampos(idInput, false);
-
         if (bLimpia.length < 3) return;
         const sugerencias = maestros.filter(m => m.rut.replace(/-/g, "").startsWith(bLimpia));
-        
         sugerencias.forEach(p => {
             const d = document.createElement('div'); 
             d.className="sugerencia-item"; 
@@ -86,7 +83,6 @@ export function activarAutocompletadoPatente(idInput, idBox) {
     };
 }
 
-// --- GESTIÓN DE GUARDIAS ---
 export const cargarGuardiasYListados = async () => {
     const colRef = collection(db, "lista_guardias");
     const renderizar = (docs) => {
@@ -98,57 +94,39 @@ export const cargarGuardiasYListados = async () => {
             if (el) el.innerHTML = opciones;
         });
     };
-    const inicialSnap = await getDocs(colRef);
-    renderizar(inicialSnap.docs);
-    onSnapshot(colRef, (s) => { renderizar(s.docs); });
+    const snap = await getDocs(colRef);
+    renderizar(snap.docs);
+    onSnapshot(colRef, (s) => renderizar(s.docs));
 };
 
 window.borrarG = async (id) => { if(confirm("¿Eliminar?")) await deleteDoc(doc(db, "lista_guardias", id)); };
 
-// --- GUARDADO ---
 export const guardarRegistro = async (data) => {
     const ahora = new Date();
     data.fecha = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}`;
     data.hora = ahora.toLocaleTimeString('es-CL', { hour12: false });
     try {
         await addDoc(collection(db, "ingresos"), data);
-        alert("✅ Registro guardado");
+        alert("✅ Guardado");
     } catch (e) { alert("Error: " + e.message); }
 };
 
-// --- EXPORTACIÓN REFORZADA (SOLUCIÓN FEBRERO) ---
 export const exportarExcel = async (inicio, fin, tipoF) => {
-    const snap = await getDocs(collection(db, "ingresos"));
-    
-    let filtrados = snap.docs.map(d => d.data()).filter(r => {
-        if (!r.fecha) return false;
-        
-        // Normalización para comparar (DD-MM-YYYY a YYYY-MM-DD)
-        let fComp = r.fecha;
-        if (r.fecha.includes("-") && r.fecha.split("-")[0].length === 2) {
-            const [d, m, a] = r.fecha.split("-");
-            fComp = `${a}-${m}-${d}`;
-        }
-        
-        return (fComp >= inicio && fComp <= fin) && (tipoF === "TODOS" || r.tipo === tipoF);
-    });
-
-    if(filtrados.length === 0) return alert(`Sin datos para el rango ${inicio} al ${fin}`);
-
-    const datosExcel = filtrados.map(r => ({
-        "Fecha": r.fecha,
-        "H. Ingreso": r.hora || r.horaIngreso,
-        "Tipo": r.tipo,
-        "Nombre": r.nombre,
-        "Rut": r.rut,
-        "Patente": r.patente,
-        "Empresa": r.empresa || "",
-        "Guía": r.guia || "",
-        "Sello": r.sello || ""
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(datosExcel);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Reporte");
-    XLSX.writeFile(wb, `Reporte_${tipoF}_${inicio}.xlsx`);
+    try {
+        const snap = await getDocs(collection(db, "ingresos"));
+        let filtrados = snap.docs.map(d => d.data()).filter(r => {
+            if (!r.fecha) return false;
+            let f = r.fecha;
+            if (f.includes("-") && f.split("-")[0].length === 2) {
+                const [d, m, a] = f.split("-");
+                f = `${a}-${m}-${d}`;
+            }
+            return (f >= inicio && f <= fin) && (tipoF === "TODOS" || r.tipo === tipoF);
+        });
+        if(filtrados.length === 0) return alert("Sin datos");
+        const ws = XLSX.utils.json_to_sheet(filtrados);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+        XLSX.writeFile(wb, `Reporte.xlsx`);
+    } catch (e) { alert("Error Excel: " + e.message); }
 };
