@@ -32,11 +32,9 @@ export function activarAutocompletadoRUT(idInput, idBox) {
         const bLimpia = val.replace(/-/g, "");
         const box = document.getElementById(idBox);
         box.innerHTML = "";
-
         gestionarBloqueoCampos(idInput, false);
 
         if (bLimpia.length < 3) return;
-        
         const sugerencias = maestros.filter(m => m.rut.replace(/-/g, "").startsWith(bLimpia));
         
         sugerencias.forEach(p => {
@@ -62,4 +60,37 @@ export function activarAutocompletadoRUT(idInput, idBox) {
     };
 }
 
-function gestionarBloqueo
+function gestionarBloqueoCampos(idInput, bloquear) {
+    const sufijos = idInput.split('-')[0]; 
+    const nombre = document.getElementById(`${sufijos}-nombre`);
+    if (nombre) {
+        nombre.readOnly = bloquear;
+        bloquear ? nombre.classList.add('readonly') : nombre.classList.remove('readonly');
+    }
+}
+
+export function activarAutocompletadoPatente(idInput, idBox) {
+    const input = document.getElementById(idInput);
+    if (!input) return;
+    input.oninput = (e) => {
+        const val = e.target.value = formatearPatente(e.target.value);
+        const box = document.getElementById(idBox);
+        box.innerHTML = "";
+        if (val.length < 2) return;
+        const bLimpia = val.replace(/-/g, "");
+        maestroPatentes.filter(p => p.patente.replace(/-/g, "").startsWith(bLimpia)).forEach(item => {
+            const d = document.createElement('div'); d.className="sugerencia-item"; d.textContent=item.patente;
+            d.onclick = () => { input.value = item.patente; box.innerHTML=""; };
+            box.appendChild(d);
+        });
+    };
+}
+
+// --- GESTIÓN DE GUARDIAS ---
+export const cargarGuardiasYListados = async () => {
+    const colRef = collection(db, "lista_guardias");
+    const renderizar = (docs) => {
+        listaGuardias = docs.map(d => ({id: d.id, ...d.data()}));
+        let opciones = '<option value="">-- Seleccione Guardia --</option>';
+        listaGuardias.forEach(g => { opciones += `<option value="${g.nombre}">${g.nombre}</option>`; });
+        ['t-guardia-id', 'v-guardia-id', 'a-guardia
