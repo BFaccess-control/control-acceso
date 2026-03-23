@@ -105,11 +105,11 @@ async function lgResolveRole(user, db) {
     const snap = await db.collection('admins').doc(user.uid).get();
     if (snap.exists) {
       const data = snap.data();
-      // El documento puede tener campo `rol` = 'admin' | 'jefatura'
       return data.rol || ROLES.JEFATURA;
     }
   } catch (err) {
-    console.warn('[lg] No se pudo resolver rol desde Firestore:', err);
+    // Usuario estándar no tiene permiso para leer admins — es comportamiento normal
+    // Se asigna rol USUARIO sin mostrar error
   }
 
   return ROLES.USUARIO;
